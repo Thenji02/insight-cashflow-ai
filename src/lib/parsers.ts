@@ -31,10 +31,10 @@ export async function parseFileToTransactions(
 
 async function extractPdfText(file: File): Promise<string> {
   const pdfjs = await import("pdfjs-dist");
-  // Use a CDN worker matching the installed version for reliability across bundlers.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const v = (pdfjs as any).version ?? "5.7.284";
-  pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${v}/pdf.worker.min.mjs`;
+  // Load the worker from the bundled package via Vite's ?url import so it
+  // works offline and isn't subject to CDN availability/CORS issues.
+  const workerUrl = (await import("pdfjs-dist/build/pdf.worker.min.mjs?url")).default;
+  pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
   const buf = await file.arrayBuffer();
   const doc = await pdfjs.getDocument({ data: buf }).promise;
   const parts: string[] = [];
