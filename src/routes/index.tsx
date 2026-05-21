@@ -81,13 +81,24 @@ function Index() {
   async function handleRaw(raw: RawTx[]) {
     if (!raw.length) {
       toast.error("No transactions found in file.");
+      setLoading(false);
       return;
     }
     setLoading(true);
     try {
       const limited = raw.slice(0, 300);
-      const { categories, insights: ins, recommendations: recs } = await categorize({
-        data: { transactions: limited.map(({ date, description, amount }) => ({ date, description, amount })) },
+      const {
+        categories,
+        insights: ins,
+        recommendations: recs,
+      } = await categorize({
+        data: {
+          transactions: limited.map(({ date, description, amount }) => ({
+            date,
+            description,
+            amount,
+          })),
+        },
       });
       setTxs(limited.map((t, i) => ({ ...t, category: categories[i] ?? "Other" })));
       setInsights(ins);
@@ -125,12 +136,7 @@ function Index() {
       <Header />
       <main className="mx-auto max-w-7xl px-6 pb-24">
         {txs.length === 0 ? (
-          <Landing
-            loading={loading}
-            onFile={onFile}
-            onSample={loadSample}
-            fileRef={fileRef}
-          />
+          <Landing loading={loading} onFile={onFile} onSample={loadSample} fileRef={fileRef} />
         ) : (
           <Dashboard
             txs={txs}
@@ -190,8 +196,8 @@ function Landing({
           See where your money really goes.
         </h1>
         <p className="mx-auto mt-4 max-w-2xl text-balance text-base text-muted-foreground md:text-lg">
-          Upload your bank statement. AI categorizes every transaction, finds patterns,
-          and predicts next month's spending — in seconds.
+          Upload your bank statement. AI categorizes every transaction, finds patterns, and predicts
+          next month's spending — in seconds.
         </p>
 
         <label
@@ -218,12 +224,15 @@ function Landing({
             onChange={(e) => {
               const f = e.target.files?.[0];
               if (f) onFile(f);
+              e.currentTarget.value = "";
             }}
           />
           {loading ? (
             <>
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="mt-4 text-sm text-muted-foreground">AI is analyzing your transactions…</p>
+              <p className="mt-4 text-sm text-muted-foreground">
+                AI is analyzing your transactions…
+              </p>
             </>
           ) : (
             <>
@@ -237,12 +246,7 @@ function Landing({
         </label>
 
         <div className="mt-6 flex items-center justify-center gap-3">
-          <Button
-            size="lg"
-            variant="secondary"
-            disabled={loading}
-            onClick={onSample}
-          >
+          <Button size="lg" variant="secondary" disabled={loading} onClick={onSample}>
             <FileText className="mr-2 h-4 w-4" /> Try with sample data
           </Button>
         </div>
@@ -269,15 +273,7 @@ function Landing({
   );
 }
 
-function Feature({
-  icon,
-  title,
-  body,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  body: string;
-}) {
+function Feature({ icon, title, body }: { icon: React.ReactNode; title: string; body: string }) {
   return (
     <Card className="border-border bg-card/60 p-6 backdrop-blur">
       <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -322,11 +318,7 @@ function Dashboard({
         <Stat label="Total spent" value={fmt(stats.totalSpent)} accent />
         <Stat label="Total income" value={fmt(stats.totalIncome)} />
         <Stat label="Avg / month" value={fmt(stats.avgMonth)} />
-        <Stat
-          label="Next month forecast"
-          value={fmt(stats.forecast)}
-          hint="Linear projection"
-        />
+        <Stat label="Next month forecast" value={fmt(stats.forecast)} hint="Linear projection" />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-5">
@@ -384,7 +376,11 @@ function Dashboard({
               <LineChart data={stats.byMonth}>
                 <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
                 <XAxis dataKey="month" stroke="var(--muted-foreground)" fontSize={12} />
-                <YAxis stroke="var(--muted-foreground)" fontSize={12} tickFormatter={(v) => `$${v}`} />
+                <YAxis
+                  stroke="var(--muted-foreground)"
+                  fontSize={12}
+                  tickFormatter={(v) => `$${v}`}
+                />
                 <Tooltip
                   contentStyle={{
                     background: "var(--popover)",
@@ -448,10 +444,7 @@ function Dashboard({
         ) : (
           <ul className="mt-4 grid gap-3 md:grid-cols-2">
             {recommendations.map((r, i) => (
-              <li
-                key={i}
-                className="rounded-xl border border-border bg-background/40 p-4"
-              >
+              <li key={i} className="rounded-xl border border-border bg-background/40 p-4">
                 <div className="flex items-center justify-between gap-3">
                   <p className="font-medium">{r.title}</p>
                   <ImpactBadge impact={r.impact} />
@@ -516,9 +509,7 @@ function Stat({
   accent?: boolean;
 }) {
   return (
-    <Card
-      className={`border-border p-5 ${accent ? "bg-primary/10" : "bg-card/60"}`}
-    >
+    <Card className={`border-border p-5 ${accent ? "bg-primary/10" : "bg-card/60"}`}>
       <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
       <p className="mt-2 text-2xl font-semibold tabular-nums">{value}</p>
       {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
@@ -542,7 +533,9 @@ function computeStats(txs: Categorized[]) {
   const totalIncome = income.reduce((s, t) => s + t.amount, 0);
 
   const byCatMap = new Map<string, number>();
-  spent.forEach((t) => byCatMap.set(t.category, (byCatMap.get(t.category) ?? 0) + Math.abs(t.amount)));
+  spent.forEach((t) =>
+    byCatMap.set(t.category, (byCatMap.get(t.category) ?? 0) + Math.abs(t.amount)),
+  );
   const byCategory = [...byCatMap.entries()]
     .map(([name, value]) => ({ name, value: Number(value.toFixed(2)) }))
     .sort((a, b) => b.value - a.value);
@@ -560,7 +553,7 @@ function computeStats(txs: Categorized[]) {
       month: prettyMonth(month),
       spent: Number(spent.toFixed(2)),
       forecast: null,
-    })
+    }),
   );
 
   // Forecast: weighted recent average (last 3 months, more weight to recent).
@@ -620,7 +613,7 @@ function ChatAssistant({ stats, txs }: { stats: StatsShape; txs: Categorized[] }
     {
       role: "assistant",
       content:
-        "Hi! I'm your finance assistant. Ask me anything about your spending — try \"Where did I spend the most?\" or \"How can I save money?\"",
+        'Hi! I\'m your finance assistant. Ask me anything about your spending — try "Where did I spend the most?" or "How can I save money?"',
     },
   ]);
   const [input, setInput] = useState("");
@@ -647,7 +640,7 @@ function ChatAssistant({ stats, txs }: { stats: StatsShape; txs: Categorized[] }
         category: t.category,
       })),
     }),
-    [stats, txs]
+    [stats, txs],
   );
 
   async function send(text: string) {
@@ -658,9 +651,7 @@ function ChatAssistant({ stats, txs }: { stats: StatsShape; txs: Categorized[] }
     setInput("");
     setPending(true);
     try {
-      const history = next
-        .slice(-10, -1)
-        .map((m) => ({ role: m.role, content: m.content }));
+      const history = next.slice(-10, -1).map((m) => ({ role: m.role, content: m.content }));
       const { answer } = await ask({ data: { question: q, context, history } });
       setMessages((m) => [...m, { role: "assistant", content: answer }]);
     } catch (e) {
@@ -693,10 +684,7 @@ function ChatAssistant({ stats, txs }: { stats: StatsShape; txs: Categorized[] }
         className="mt-4 max-h-80 space-y-3 overflow-y-auto rounded-xl border border-border bg-background/40 p-4"
       >
         {messages.map((m, i) => (
-          <div
-            key={i}
-            className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
-          >
+          <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
             <div
               className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
                 m.role === "user"
