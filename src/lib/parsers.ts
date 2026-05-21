@@ -26,6 +26,10 @@ export async function parseFileToTransactions(
     const parsed = parseTransactionsFromStatementText(text);
     if (parsed.length >= 3) return parsed;
 
+    if (text.replace(/\s/g, "").length < 250) {
+      throw new Error("This PDF appears to be scanned or image-only. Please upload a text-based PDF, CSV, or Excel export.");
+    }
+
     return extractFromText(compactStatementText(text));
   }
   // Last-ditch: try CSV parse on text
