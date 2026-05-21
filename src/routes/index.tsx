@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import {
   PieChart,
@@ -14,13 +14,26 @@ import {
   CartesianGrid,
   Legend,
 } from "recharts";
-import { Upload, Sparkles, TrendingUp, Wallet, Brain, FileText, Loader2 } from "lucide-react";
+import {
+  Upload,
+  Sparkles,
+  TrendingUp,
+  Wallet,
+  Brain,
+  FileText,
+  Loader2,
+  Lightbulb,
+  Send,
+  MessageCircle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
-import { parseTransactionsCsv, SAMPLE_CSV, type RawTx } from "@/lib/csv";
+import { SAMPLE_CSV, parseTransactionsCsv, type RawTx } from "@/lib/csv";
+import { parseFileToTransactions } from "@/lib/parsers";
 import { categorizeTransactions } from "@/lib/categorize.functions";
+import { askFinancialAssistant, extractTransactionsFromText } from "@/lib/assistant.functions";
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -37,6 +50,8 @@ export const Route = createFileRoute("/")({
 });
 
 type Categorized = RawTx & { category: string };
+type Recommendation = { title: string; detail: string; impact: string };
+type ChatMsg = { role: "user" | "assistant"; content: string };
 
 const CHART_COLORS = [
   "var(--chart-1)",
@@ -57,9 +72,11 @@ const CHART_COLORS = [
 function Index() {
   const [txs, setTxs] = useState<Categorized[]>([]);
   const [insights, setInsights] = useState<string[]>([]);
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const categorize = useServerFn(categorizeTransactions);
+  const extract = useServerFn(extractTransactionsFromText);
 
   async function handleRaw(raw: RawTx[]) {
     if (!raw.length) {
@@ -69,11 +86,12 @@ function Index() {
     setLoading(true);
     try {
       const limited = raw.slice(0, 300);
-      const { categories, insights: ins } = await categorize({
+      const { categories, insights: ins, recommendations: recs } = await categorize({
         data: { transactions: limited.map(({ date, description, amount }) => ({ date, description, amount })) },
       });
       setTxs(limited.map((t, i) => ({ ...t, category: categories[i] ?? "Other" })));
       setInsights(ins);
+      setRecommendations(recs ?? []);
       toast.success(`Categorized ${limited.length} transactions`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to categorize");
@@ -83,8 +101,18 @@ function Index() {
   }
 
   async function onFile(file: File) {
-    const text = await file.text();
-    handleRaw(parseTransactionsCsv(text));
+    setLoading(true);
+    try {
+      const raw = await parseFileToTransactions(file, async (text) => {
+        toast.message("Reading document with AI…");
+        const { transactions } = await extract({ data: { text } });
+        return transactions;
+      });
+      await handleRaw(raw);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to read file");
+      setLoading(false);
+    }
   }
 
   function loadSample() {
@@ -107,10 +135,12 @@ function Index() {
           <Dashboard
             txs={txs}
             insights={insights}
+            recommendations={recommendations}
             loading={loading}
             onReset={() => {
               setTxs([]);
               setInsights([]);
+              setRecommendations([]);
             }}
           />
         )}
@@ -183,7 +213,7 @@ function Landing({
           <input
             ref={fileRef}
             type="file"
-            accept=".csv,text/csv"
+            accept=".csv,.xlsx,.xls,.pdf,text/csv,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
             className="hidden"
             onChange={(e) => {
               const f = e.target.files?.[0];
@@ -198,9 +228,9 @@ function Landing({
           ) : (
             <>
               <Upload className="h-8 w-8 text-primary" />
-              <p className="mt-4 font-medium">Drop your CSV here, or click to browse</p>
+              <p className="mt-4 font-medium">Drop a CSV, Excel, or PDF statement</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Needs columns like Date, Description, Amount
+                Bank exports, .xlsx, or PDF statements all work
               </p>
             </>
           )}
@@ -262,11 +292,13 @@ function Feature({
 function Dashboard({
   txs,
   insights,
+  recommendations,
   loading,
   onReset,
 }: {
   txs: Categorized[];
   insights: string[];
+  recommendations: Recommendation[];
   loading: boolean;
   onReset: () => void;
 }) {
@@ -405,6 +437,33 @@ function Dashboard({
           </ul>
         )}
       </Card>
+
+      <Card className="border-border bg-card/60 p-6">
+        <div className="flex items-center gap-2">
+          <Lightbulb className="h-4 w-4 text-primary" />
+          <h3 className="text-sm font-medium text-muted-foreground">Smart recommendations</h3>
+        </div>
+        {recommendations.length === 0 ? (
+          <p className="mt-4 text-sm text-muted-foreground">No recommendations yet.</p>
+        ) : (
+          <ul className="mt-4 grid gap-3 md:grid-cols-2">
+            {recommendations.map((r, i) => (
+              <li
+                key={i}
+                className="rounded-xl border border-border bg-background/40 p-4"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-medium">{r.title}</p>
+                  <ImpactBadge impact={r.impact} />
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">{r.detail}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+
+      <ChatAssistant stats={stats} txs={txs} />
 
       <Card className="border-border bg-card/60 p-6">
         <h3 className="text-sm font-medium text-muted-foreground">Recent transactions</h3>
