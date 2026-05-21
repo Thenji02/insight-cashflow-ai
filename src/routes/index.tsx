@@ -81,6 +81,7 @@ function Index() {
   async function handleRaw(raw: RawTx[]) {
     if (!raw.length) {
       toast.error("No transactions found in file.");
+      setLoading(false);
       return;
     }
     setLoading(true);
@@ -218,6 +219,7 @@ function Landing({
             onChange={(e) => {
               const f = e.target.files?.[0];
               if (f) onFile(f);
+              e.currentTarget.value = "";
             }}
           />
           {loading ? (
