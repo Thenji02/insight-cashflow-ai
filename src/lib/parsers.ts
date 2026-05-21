@@ -4,7 +4,7 @@ export type { RawTx };
 
 export async function parseFileToTransactions(
   file: File,
-  extractFromText: (text: string) => Promise<RawTx[]>
+  extractFromText: (text: string) => Promise<RawTx[]>,
 ): Promise<RawTx[]> {
   const name = file.name.toLowerCase();
   if (name.endsWith(".csv") || file.type === "text/csv") {
@@ -27,7 +27,9 @@ export async function parseFileToTransactions(
     if (parsed.length >= 3) return parsed;
 
     if (text.replace(/\s/g, "").length < 250) {
-      throw new Error("This PDF appears to be scanned or image-only. Please upload a text-based PDF, CSV, or Excel export.");
+      throw new Error(
+        "This PDF appears to be scanned or image-only. Please upload a text-based PDF, CSV, or Excel export.",
+      );
     }
 
     return extractFromText(compactStatementText(text));
@@ -38,7 +40,9 @@ export async function parseFileToTransactions(
 
 export function parseTransactionsFromStatementText(text: string): RawTx[] {
   const scoped = compactStatementText(text, 80_000);
-  const matches = [...scoped.matchAll(/\b(\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[/-]\d{1,2}[/-]\d{4})\b/g)];
+  const matches = [
+    ...scoped.matchAll(/\b(\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[/-]\d{1,2}[/-]\d{4})\b/g),
+  ];
   const out: RawTx[] = [];
 
   for (let i = 0; i < matches.length; i++) {
@@ -51,7 +55,7 @@ export function parseTransactionsFromStatementText(text: string): RawTx[] {
 
     if (
       /fee summary|money (in|out) summary|spending summary|statement information|clientcare|capitec bank|page\s+\d+|date\s+description\s+category|from date|to date|print date|vat registration/.test(
-        lowered
+        lowered,
       )
     ) {
       continue;
@@ -110,7 +114,7 @@ async function extractPdfText(file: File): Promise<string> {
         items
           .sort((a, b) => a.x - b.x)
           .map((item) => item.str)
-          .join(" ")
+          .join(" "),
       )
       .join("\n");
     parts.push(pageText);
@@ -118,7 +122,8 @@ async function extractPdfText(file: File): Promise<string> {
   return parts.join("\n");
 }
 
-const MONEY_TOKEN_REGEX = /(?<![A-Za-z])(?:[-+]?\s*(?:R\s*)?\d[\d\s,]*\.\d{2}|\(\s*(?:R\s*)?\d[\d\s,]*\.\d{2}\s*\))/gi;
+const MONEY_TOKEN_REGEX =
+  /(?<![A-Za-z])(?:[-+]?\s*(?:R\s*)?\d[\d\s,]*\.\d{2}|\(\s*(?:R\s*)?\d[\d\s,]*\.\d{2}\s*\))/gi;
 
 function extractMoneyValues(segment: string): { token: string; value: number }[] {
   return [...segment.matchAll(MONEY_TOKEN_REGEX)]
