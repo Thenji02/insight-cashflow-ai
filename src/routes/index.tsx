@@ -313,7 +313,7 @@ function Dashboard({
                   stroke="var(--background)"
                   strokeWidth={2}
                 >
-                  {stats.byCategory.map((_entry, i: number) => (
+                  {stats.byCategory.map((_entry: { name: string; value: number }, i: number) => (
                     <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                   ))}
                 </Pie>
