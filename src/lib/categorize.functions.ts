@@ -121,7 +121,42 @@ export const categorizeTransactions = createServerFn({ method: "POST" })
       }
     }
 
-    return { categories: valid, insights };
+    // Smart financial recommendations
+    const recRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are a smart personal-finance coach. Given category totals and monthly totals, return 4 concrete, prioritized money-saving recommendations as JSON: {\"recommendations\": [{\"title\":\"...\",\"detail\":\"...\",\"impact\":\"low|medium|high\"}, ...]}. Each detail under 160 chars. Be specific with dollar amounts where useful.",
+          },
+          {
+            role: "user",
+            content: JSON.stringify({
+              byCategory: aggregateByCategory(data.transactions, valid),
+              byMonth: aggregateByMonth(data.transactions),
+            }),
+          },
+        ],
+        response_format: { type: "json_object" },
+      }),
+    });
+
+    let recommendations: { title: string; detail: string; impact: string }[] = [];
+    if (recRes.ok) {
+      const rj = (await recRes.json()) as { choices: { message: { content: string } }[] };
+      try {
+        const p = JSON.parse(rj.choices?.[0]?.message?.content ?? "{}");
+        if (Array.isArray(p.recommendations)) recommendations = p.recommendations.slice(0, 6);
+      } catch {
+        /* ignore */
+      }
+    }
+
+    return { categories: valid, insights, recommendations };
   });
 
 function aggregateByCategory(
