@@ -1,5 +1,4 @@
 import { parseTransactionsCsv, type RawTx } from "./csv";
-import * as XLSX from "xlsx";
 
 export type { RawTx };
 
@@ -13,6 +12,7 @@ export async function parseFileToTransactions(
   }
   if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
     const buf = await file.arrayBuffer();
+    const XLSX = await import("xlsx");
     const wb = XLSX.read(buf, { type: "array" });
     const sheet = wb.Sheets[wb.SheetNames[0]];
     const csv = XLSX.utils.sheet_to_csv(sheet);
