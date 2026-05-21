@@ -114,7 +114,7 @@ async function extractPdfText(file: File): Promise<string> {
   return parts.join("\n");
 }
 
-const MONEY_TOKEN_REGEX = /[-+()]?\s*R?\s*\d[\d\s,]*\.\d{2}\)?/gi;
+const MONEY_TOKEN_REGEX = /(?<![A-Za-z])(?:[-+]?\s*(?:R\s*)?\d[\d\s,]*\.\d{2}|\(\s*(?:R\s*)?\d[\d\s,]*\.\d{2}\s*\))/gi;
 
 function extractMoneyValues(segment: string): { token: string; value: number }[] {
   return [...segment.matchAll(MONEY_TOKEN_REGEX)]
