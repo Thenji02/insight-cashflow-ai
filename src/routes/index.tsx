@@ -313,7 +313,7 @@ function Dashboard({
                   stroke="var(--background)"
                   strokeWidth={2}
                 >
-                  {stats.byCategory.map((_, i) => (
+                  {stats.byCategory.map((_entry, i: number) => (
                     <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                   ))}
                 </Pie>
@@ -330,7 +330,7 @@ function Dashboard({
             </ResponsiveContainer>
           </div>
           <ul className="mt-4 space-y-2">
-            {stats.byCategory.slice(0, 6).map((c, i) => (
+            {stats.byCategory.slice(0, 6).map((c: { name: string; value: number }, i: number) => (
               <li key={c.name} className="flex items-center justify-between text-sm">
                 <span className="flex items-center gap-2">
                   <span
