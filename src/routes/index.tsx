@@ -596,3 +596,158 @@ function prettyMonth(k: string) {
   const [y, m] = k.split("-").map(Number);
   return new Date(y, m - 1, 1).toLocaleString(undefined, { month: "short", year: "2-digit" });
 }
+
+function ImpactBadge({ impact }: { impact: string }) {
+  const i = impact?.toLowerCase();
+  const cls =
+    i === "high"
+      ? "bg-primary/15 text-primary border-primary/30"
+      : i === "medium"
+        ? "bg-chart-3/15 text-chart-3 border-chart-3/30"
+        : "bg-muted text-muted-foreground border-border";
+  return (
+    <span className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide ${cls}`}>
+      {impact || "info"}
+    </span>
+  );
+}
+
+type StatsShape = ReturnType<typeof computeStats>;
+
+function ChatAssistant({ stats, txs }: { stats: StatsShape; txs: Categorized[] }) {
+  const ask = useServerFn(askFinancialAssistant);
+  const [messages, setMessages] = useState<ChatMsg[]>([
+    {
+      role: "assistant",
+      content:
+        "Hi! I'm your finance assistant. Ask me anything about your spending — try \"Where did I spend the most?\" or \"How can I save money?\"",
+    },
+  ]);
+  const [input, setInput] = useState("");
+  const [pending, setPending] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages, pending]);
+
+  const context = useMemo(
+    () => ({
+      totalSpent: Number(stats.totalSpent.toFixed(2)),
+      totalIncome: Number(stats.totalIncome.toFixed(2)),
+      months: stats.months,
+      byCategory: stats.byCategory.slice(0, 20),
+      byMonth: stats.byMonth
+        .filter((m) => m.spent > 0)
+        .map((m) => ({ month: m.month, spent: m.spent })),
+      recentTransactions: txs.slice(0, 40).map((t) => ({
+        date: t.date,
+        description: t.description,
+        amount: t.amount,
+        category: t.category,
+      })),
+    }),
+    [stats, txs]
+  );
+
+  async function send(text: string) {
+    const q = text.trim();
+    if (!q || pending) return;
+    const next: ChatMsg[] = [...messages, { role: "user", content: q }];
+    setMessages(next);
+    setInput("");
+    setPending(true);
+    try {
+      const history = next
+        .slice(-10, -1)
+        .map((m) => ({ role: m.role, content: m.content }));
+      const { answer } = await ask({ data: { question: q, context, history } });
+      setMessages((m) => [...m, { role: "assistant", content: answer }]);
+    } catch (e) {
+      setMessages((m) => [
+        ...m,
+        {
+          role: "assistant",
+          content: e instanceof Error ? e.message : "Something went wrong.",
+        },
+      ]);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  const suggestions = [
+    "Where did I spend the most?",
+    "How can I save money?",
+    "What's my biggest recurring expense?",
+  ];
+
+  return (
+    <Card className="border-border bg-card/60 p-6">
+      <div className="flex items-center gap-2">
+        <MessageCircle className="h-4 w-4 text-primary" />
+        <h3 className="text-sm font-medium text-muted-foreground">Ask your AI assistant</h3>
+      </div>
+      <div
+        ref={scrollRef}
+        className="mt-4 max-h-80 space-y-3 overflow-y-auto rounded-xl border border-border bg-background/40 p-4"
+      >
+        {messages.map((m, i) => (
+          <div
+            key={i}
+            className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
+          >
+            <div
+              className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
+                m.role === "user"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-foreground"
+              }`}
+            >
+              {m.content}
+            </div>
+          </div>
+        ))}
+        {pending && (
+          <div className="flex justify-start">
+            <div className="rounded-2xl bg-secondary px-4 py-2 text-sm text-muted-foreground">
+              <Loader2 className="inline h-3.5 w-3.5 animate-spin" /> Thinking…
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        {suggestions.map((s) => (
+          <button
+            key={s}
+            onClick={() => send(s)}
+            disabled={pending}
+            className="rounded-full border border-border bg-background/40 px-3 py-1 text-xs text-muted-foreground transition hover:border-primary/60 hover:text-foreground disabled:opacity-50"
+          >
+            {s}
+          </button>
+        ))}
+      </div>
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          send(input);
+        }}
+        className="mt-3 flex gap-2"
+      >
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Ask about your spending…"
+          disabled={pending}
+          className="flex-1 rounded-xl border border-border bg-background/40 px-4 py-2 text-sm outline-none placeholder:text-muted-foreground focus:border-primary/60"
+        />
+        <Button type="submit" disabled={pending || !input.trim()}>
+          <Send className="h-4 w-4" />
+        </Button>
+      </form>
+    </Card>
+  );
+}
