@@ -711,7 +711,7 @@ function ChatAssistant({
     setInput("");
     setPending(true);
     try {
-      const history = next.slice(-10, -1).map((m) => ({ role: m.role, content: m.content }));
+      const history = next.slice(-20, -1).map((m) => ({ role: m.role, content: m.content }));
       const { answer } = await ask({ data: { question: q, context, history } });
       setMessages((m) => [...m, { role: "assistant", content: answer }]);
     } catch (e) {
