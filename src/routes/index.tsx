@@ -79,7 +79,7 @@ function Index() {
   const categorize = useServerFn(categorizeTransactions);
   const extract = useServerFn(extractTransactionsFromText);
 
-  async function handleRaw(raw: RawTx[]) {
+  async function handleRaw(raw: RawTx[], curr: string = "USD") {
     if (!raw.length) {
       toast.error("No transactions found in file.");
       setLoading(false);
@@ -94,6 +94,7 @@ function Index() {
         recommendations: recs,
       } = await categorize({
         data: {
+          currency: curr,
           transactions: limited.map(({ date, description, amount }) => ({
             date,
             description,
@@ -121,7 +122,7 @@ function Index() {
         return transactions;
       });
       setCurrency(result.currency);
-      await handleRaw(result.transactions);
+      await handleRaw(result.transactions, result.currency);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to read file");
       setLoading(false);
@@ -130,7 +131,7 @@ function Index() {
 
   function loadSample() {
     setCurrency("USD");
-    handleRaw(parseTransactionsCsv(SAMPLE_CSV));
+    handleRaw(parseTransactionsCsv(SAMPLE_CSV), "USD");
   }
 
   return (
