@@ -635,7 +635,17 @@ function ImpactBadge({ impact }: { impact: string }) {
 
 type StatsShape = ReturnType<typeof computeStats>;
 
-function ChatAssistant({ stats, txs }: { stats: StatsShape; txs: Categorized[] }) {
+function ChatAssistant({
+  stats,
+  txs,
+  currency,
+  fmt,
+}: {
+  stats: StatsShape;
+  txs: Categorized[];
+  currency: string;
+  fmt: (n: number) => string;
+}) {
   const ask = useServerFn(askFinancialAssistant);
   const [messages, setMessages] = useState<ChatMsg[]>([
     {
@@ -654,6 +664,7 @@ function ChatAssistant({ stats, txs }: { stats: StatsShape; txs: Categorized[] }
 
   const context = useMemo(
     () => ({
+      currency,
       totalSpent: Number(stats.totalSpent.toFixed(2)),
       totalIncome: Number(stats.totalIncome.toFixed(2)),
       months: stats.months,
@@ -668,8 +679,9 @@ function ChatAssistant({ stats, txs }: { stats: StatsShape; txs: Categorized[] }
         category: t.category,
       })),
     }),
-    [stats, txs],
+    [stats, txs, currency],
   );
+  void fmt;
 
   async function send(text: string) {
     const q = text.trim();
