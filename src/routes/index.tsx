@@ -74,6 +74,7 @@ function Index() {
   const [insights, setInsights] = useState<string[]>([]);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(false);
+  const [currency, setCurrency] = useState<string>("USD");
   const fileRef = useRef<HTMLInputElement>(null);
   const categorize = useServerFn(categorizeTransactions);
   const extract = useServerFn(extractTransactionsFromText);
@@ -114,12 +115,13 @@ function Index() {
   async function onFile(file: File) {
     setLoading(true);
     try {
-      const raw = await parseFileToTransactions(file, async (text) => {
+      const result = await parseFileToTransactions(file, async (text) => {
         toast.message("Reading document with AI…");
         const { transactions } = await extract({ data: { text } });
         return transactions;
       });
-      await handleRaw(raw);
+      setCurrency(result.currency);
+      await handleRaw(result.transactions);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to read file");
       setLoading(false);
@@ -127,6 +129,7 @@ function Index() {
   }
 
   function loadSample() {
+    setCurrency("USD");
     handleRaw(parseTransactionsCsv(SAMPLE_CSV));
   }
 
@@ -143,6 +146,7 @@ function Index() {
             insights={insights}
             recommendations={recommendations}
             loading={loading}
+            currency={currency}
             onReset={() => {
               setTxs([]);
               setInsights([]);
@@ -290,15 +294,19 @@ function Dashboard({
   insights,
   recommendations,
   loading,
+  currency,
   onReset,
 }: {
   txs: Categorized[];
   insights: string[];
   recommendations: Recommendation[];
   loading: boolean;
+  currency: string;
   onReset: () => void;
 }) {
   const stats = useMemo(() => computeStats(txs), [txs]);
+  const fmt = useMemo(() => makeFmt(currency), [currency]);
+  const symbol = useMemo(() => currencySymbol(currency), [currency]);
 
   return (
     <section className="mt-6 space-y-6">
@@ -379,7 +387,7 @@ function Dashboard({
                 <YAxis
                   stroke="var(--muted-foreground)"
                   fontSize={12}
-                  tickFormatter={(v) => `$${v}`}
+                  tickFormatter={(v) => `${symbol}${v}`}
                 />
                 <Tooltip
                   contentStyle={{
@@ -456,7 +464,7 @@ function Dashboard({
         )}
       </Card>
 
-      <ChatAssistant stats={stats} txs={txs} />
+      <ChatAssistant stats={stats} txs={txs} currency={currency} />
 
       <Card className="border-border bg-card/60 p-6">
         <h3 className="text-sm font-medium text-muted-foreground">Recent transactions</h3>
@@ -517,13 +525,33 @@ function Stat({
   );
 }
 
-function fmt(n: number) {
-  const sign = n < 0 ? "-" : "";
-  return (
-    sign +
-    "$" +
-    Math.abs(n).toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 })
-  );
+function makeFmt(currency: string) {
+  let nf: Intl.NumberFormat;
+  try {
+    nf = new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency,
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 2,
+    });
+  } catch {
+    nf = new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency: "USD",
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 2,
+    });
+  }
+  return (n: number) => nf.format(n);
+}
+
+function currencySymbol(currency: string): string {
+  try {
+    const parts = new Intl.NumberFormat(undefined, { style: "currency", currency }).formatToParts(0);
+    return parts.find((p) => p.type === "currency")?.value ?? currency;
+  } catch {
+    return "$";
+  }
 }
 
 function computeStats(txs: Categorized[]) {
@@ -607,7 +635,15 @@ function ImpactBadge({ impact }: { impact: string }) {
 
 type StatsShape = ReturnType<typeof computeStats>;
 
-function ChatAssistant({ stats, txs }: { stats: StatsShape; txs: Categorized[] }) {
+function ChatAssistant({
+  stats,
+  txs,
+  currency,
+}: {
+  stats: StatsShape;
+  txs: Categorized[];
+  currency: string;
+}) {
   const ask = useServerFn(askFinancialAssistant);
   const [messages, setMessages] = useState<ChatMsg[]>([
     {
@@ -626,6 +662,7 @@ function ChatAssistant({ stats, txs }: { stats: StatsShape; txs: Categorized[] }
 
   const context = useMemo(
     () => ({
+      currency,
       totalSpent: Number(stats.totalSpent.toFixed(2)),
       totalIncome: Number(stats.totalIncome.toFixed(2)),
       months: stats.months,
@@ -640,7 +677,7 @@ function ChatAssistant({ stats, txs }: { stats: StatsShape; txs: Categorized[] }
         category: t.category,
       })),
     }),
-    [stats, txs],
+    [stats, txs, currency],
   );
 
   async function send(text: string) {
