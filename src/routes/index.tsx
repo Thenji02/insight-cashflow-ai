@@ -74,6 +74,7 @@ function Index() {
   const [insights, setInsights] = useState<string[]>([]);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(false);
+  const [currency, setCurrency] = useState<string>("USD");
   const fileRef = useRef<HTMLInputElement>(null);
   const categorize = useServerFn(categorizeTransactions);
   const extract = useServerFn(extractTransactionsFromText);
@@ -114,12 +115,13 @@ function Index() {
   async function onFile(file: File) {
     setLoading(true);
     try {
-      const raw = await parseFileToTransactions(file, async (text) => {
+      const result = await parseFileToTransactions(file, async (text) => {
         toast.message("Reading document with AI…");
         const { transactions } = await extract({ data: { text } });
         return transactions;
       });
-      await handleRaw(raw);
+      setCurrency(result.currency);
+      await handleRaw(result.transactions);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to read file");
       setLoading(false);
@@ -127,6 +129,7 @@ function Index() {
   }
 
   function loadSample() {
+    setCurrency("USD");
     handleRaw(parseTransactionsCsv(SAMPLE_CSV));
   }
 
@@ -143,6 +146,7 @@ function Index() {
             insights={insights}
             recommendations={recommendations}
             loading={loading}
+            currency={currency}
             onReset={() => {
               setTxs([]);
               setInsights([]);
