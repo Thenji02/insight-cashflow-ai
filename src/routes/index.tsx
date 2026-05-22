@@ -646,13 +646,26 @@ function ChatAssistant({
   currency: string;
 }) {
   const ask = useServerFn(askFinancialAssistant);
-  const [messages, setMessages] = useState<ChatMsg[]>([
+  const STORAGE_KEY = "finlens.chat.history.v1";
+  const defaultMessages: ChatMsg[] = [
     {
       role: "assistant",
       content:
         'Hi! I\'m your finance assistant. Ask me anything about your spending — try "Where did I spend the most?" or "How can I save money?"',
     },
-  ]);
+  ];
+  const [messages, setMessages] = useState<ChatMsg[]>(() => {
+    if (typeof window === "undefined") return defaultMessages;
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      if (!raw) return defaultMessages;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed as ChatMsg[];
+    } catch {
+      /* ignore */
+    }
+    return defaultMessages;
+  });
   const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -660,6 +673,15 @@ function ChatAssistant({
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, pending]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(messages.slice(-50)));
+    } catch {
+      /* ignore */
+    }
+  }, [messages]);
 
   const context = useMemo(
     () => ({
@@ -689,7 +711,7 @@ function ChatAssistant({
     setInput("");
     setPending(true);
     try {
-      const history = next.slice(-10, -1).map((m) => ({ role: m.role, content: m.content }));
+      const history = next.slice(-20, -1).map((m) => ({ role: m.role, content: m.content }));
       const { answer } = await ask({ data: { question: q, context, history } });
       setMessages((m) => [...m, { role: "assistant", content: answer }]);
     } catch (e) {
@@ -716,6 +738,20 @@ function ChatAssistant({
       <div className="flex items-center gap-2">
         <MessageCircle className="h-4 w-4 text-primary" />
         <h3 className="text-sm font-medium text-muted-foreground">Ask your AI assistant</h3>
+        <button
+          type="button"
+          onClick={() => {
+            setMessages(defaultMessages);
+            try {
+              window.localStorage.removeItem(STORAGE_KEY);
+            } catch {
+              /* ignore */
+            }
+          }}
+          className="ml-auto text-xs text-muted-foreground hover:text-foreground"
+        >
+          Clear
+        </button>
       </div>
       <div
         ref={scrollRef}
