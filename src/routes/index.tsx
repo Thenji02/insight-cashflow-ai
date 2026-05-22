@@ -294,15 +294,19 @@ function Dashboard({
   insights,
   recommendations,
   loading,
+  currency,
   onReset,
 }: {
   txs: Categorized[];
   insights: string[];
   recommendations: Recommendation[];
   loading: boolean;
+  currency: string;
   onReset: () => void;
 }) {
   const stats = useMemo(() => computeStats(txs), [txs]);
+  const fmt = useMemo(() => makeFmt(currency), [currency]);
+  const symbol = useMemo(() => currencySymbol(currency), [currency]);
 
   return (
     <section className="mt-6 space-y-6">
@@ -383,7 +387,7 @@ function Dashboard({
                 <YAxis
                   stroke="var(--muted-foreground)"
                   fontSize={12}
-                  tickFormatter={(v) => `$${v}`}
+                  tickFormatter={(v) => `${symbol}${v}`}
                 />
                 <Tooltip
                   contentStyle={{
@@ -460,7 +464,7 @@ function Dashboard({
         )}
       </Card>
 
-      <ChatAssistant stats={stats} txs={txs} />
+      <ChatAssistant stats={stats} txs={txs} currency={currency} fmt={fmt} />
 
       <Card className="border-border bg-card/60 p-6">
         <h3 className="text-sm font-medium text-muted-foreground">Recent transactions</h3>
@@ -521,13 +525,33 @@ function Stat({
   );
 }
 
-function fmt(n: number) {
-  const sign = n < 0 ? "-" : "";
-  return (
-    sign +
-    "$" +
-    Math.abs(n).toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 })
-  );
+function makeFmt(currency: string) {
+  let nf: Intl.NumberFormat;
+  try {
+    nf = new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency,
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 2,
+    });
+  } catch {
+    nf = new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency: "USD",
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 2,
+    });
+  }
+  return (n: number) => nf.format(n);
+}
+
+function currencySymbol(currency: string): string {
+  try {
+    const parts = new Intl.NumberFormat(undefined, { style: "currency", currency }).formatToParts(0);
+    return parts.find((p) => p.type === "currency")?.value ?? currency;
+  } catch {
+    return "$";
+  }
 }
 
 function computeStats(txs: Categorized[]) {
