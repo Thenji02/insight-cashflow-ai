@@ -464,7 +464,7 @@ function Dashboard({
         )}
       </Card>
 
-      <ChatAssistant stats={stats} txs={txs} currency={currency} fmt={fmt} />
+      <ChatAssistant stats={stats} txs={txs} currency={currency} />
 
       <Card className="border-border bg-card/60 p-6">
         <h3 className="text-sm font-medium text-muted-foreground">Recent transactions</h3>
@@ -639,12 +639,10 @@ function ChatAssistant({
   stats,
   txs,
   currency,
-  fmt,
 }: {
   stats: StatsShape;
   txs: Categorized[];
   currency: string;
-  fmt: (n: number) => string;
 }) {
   const ask = useServerFn(askFinancialAssistant);
   const [messages, setMessages] = useState<ChatMsg[]>([
@@ -681,7 +679,6 @@ function ChatAssistant({
     }),
     [stats, txs, currency],
   );
-  void fmt;
 
   async function send(text: string) {
     const q = text.trim();
