@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 const txInput = z.object({
+  currency: z.string().min(3).max(8).optional(),
   transactions: z
     .array(
       z.object({
@@ -37,6 +38,7 @@ export const categorizeTransactions = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("Missing LOVABLE_API_KEY");
+    const currency = data.currency || "USD";
 
     const system = `You are a financial assistant. Categorize each bank transaction into EXACTLY ONE of: ${CATEGORIES.join(", ")}. Respond ONLY with a JSON object: {"categories": ["Cat1", "Cat2", ...]} where the array length and order matches the input transactions.`;
 
@@ -96,7 +98,7 @@ export const categorizeTransactions = createServerFn({ method: "POST" })
           {
             role: "system",
             content:
-              "You are a sharp personal-finance analyst. Given a JSON of category totals and monthly totals, return 3 concise, actionable insights as JSON: {\"insights\": [\"...\", \"...\", \"...\"]}. Use plain numbers (no markdown). Keep each under 140 chars.",
+              `You are a sharp personal-finance analyst. All monetary amounts are in ${currency}. When mentioning amounts, use the ISO code ${currency} (e.g. "${currency} 1,200"). Never use $, €, £, ¥, or any other currency symbol. Given a JSON of category totals and monthly totals, return 3 concise, actionable insights as JSON: {"insights": ["...", "...", "..."]}. Use plain numbers (no markdown). Keep each under 140 chars.`,
           },
           {
             role: "user",
@@ -131,7 +133,7 @@ export const categorizeTransactions = createServerFn({ method: "POST" })
           {
             role: "system",
             content:
-              "You are a smart personal-finance coach. Given category totals and monthly totals, return 4 concrete, prioritized money-saving recommendations as JSON: {\"recommendations\": [{\"title\":\"...\",\"detail\":\"...\",\"impact\":\"low|medium|high\"}, ...]}. Each detail under 160 chars. Be specific with dollar amounts where useful.",
+              `You are a smart personal-finance coach. All monetary amounts are in ${currency}. When mentioning amounts, ALWAYS prefix with the ISO code ${currency} (e.g. "${currency} 1,200"). Never use $, €, £, ¥, or any other currency symbol. Given category totals and monthly totals, return 4 concrete, prioritized money-saving recommendations as JSON: {"recommendations": [{"title":"...","detail":"...","impact":"low|medium|high"}, ...]}. Each detail under 160 chars. Be specific with amounts where useful.`,
           },
           {
             role: "user",
