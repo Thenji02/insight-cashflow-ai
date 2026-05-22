@@ -738,6 +738,20 @@ function ChatAssistant({
       <div className="flex items-center gap-2">
         <MessageCircle className="h-4 w-4 text-primary" />
         <h3 className="text-sm font-medium text-muted-foreground">Ask your AI assistant</h3>
+        <button
+          type="button"
+          onClick={() => {
+            setMessages(defaultMessages);
+            try {
+              window.localStorage.removeItem(STORAGE_KEY);
+            } catch {
+              /* ignore */
+            }
+          }}
+          className="ml-auto text-xs text-muted-foreground hover:text-foreground"
+        >
+          Clear
+        </button>
       </div>
       <div
         ref={scrollRef}
