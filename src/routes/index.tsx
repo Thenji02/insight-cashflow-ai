@@ -646,13 +646,26 @@ function ChatAssistant({
   currency: string;
 }) {
   const ask = useServerFn(askFinancialAssistant);
-  const [messages, setMessages] = useState<ChatMsg[]>([
+  const STORAGE_KEY = "finlens.chat.history.v1";
+  const defaultMessages: ChatMsg[] = [
     {
       role: "assistant",
       content:
         'Hi! I\'m your finance assistant. Ask me anything about your spending — try "Where did I spend the most?" or "How can I save money?"',
     },
-  ]);
+  ];
+  const [messages, setMessages] = useState<ChatMsg[]>(() => {
+    if (typeof window === "undefined") return defaultMessages;
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      if (!raw) return defaultMessages;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed as ChatMsg[];
+    } catch {
+      /* ignore */
+    }
+    return defaultMessages;
+  });
   const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -660,6 +673,15 @@ function ChatAssistant({
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, pending]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(messages.slice(-50)));
+    } catch {
+      /* ignore */
+    }
+  }, [messages]);
 
   const context = useMemo(
     () => ({
