@@ -2,13 +2,57 @@ import { parseTransactionsCsv, type RawTx } from "./csv";
 
 export type { RawTx };
 
+export type ParseResult = { transactions: RawTx[]; currency: string };
+
+const CURRENCY_PATTERNS: { code: string; regex: RegExp }[] = [
+  { code: "USD", regex: /\b(USD|US\$)\b|(?<![A-Za-z])\$/g },
+  { code: "EUR", regex: /\b(EUR)\b|€/g },
+  { code: "GBP", regex: /\b(GBP)\b|£/g },
+  { code: "JPY", regex: /\b(JPY)\b|¥/g },
+  { code: "CNY", regex: /\b(CNY|RMB)\b/g },
+  { code: "INR", regex: /\b(INR)\b|₹/g },
+  { code: "ZAR", regex: /\b(ZAR)\b|(?<![A-Za-z])R(?=\s*\d)/g },
+  { code: "AUD", regex: /\b(AUD|A\$)\b/g },
+  { code: "CAD", regex: /\b(CAD|C\$)\b/g },
+  { code: "CHF", regex: /\b(CHF)\b/g },
+  { code: "NZD", regex: /\b(NZD|NZ\$)\b/g },
+  { code: "SEK", regex: /\b(SEK|kr)\b/g },
+  { code: "NOK", regex: /\b(NOK)\b/g },
+  { code: "DKK", regex: /\b(DKK)\b/g },
+  { code: "BRL", regex: /\b(BRL|R\$)\b/g },
+  { code: "MXN", regex: /\b(MXN)\b/g },
+  { code: "SGD", regex: /\b(SGD|S\$)\b/g },
+  { code: "HKD", regex: /\b(HKD|HK\$)\b/g },
+  { code: "KRW", regex: /\b(KRW)\b|₩/g },
+  { code: "TRY", regex: /\b(TRY)\b|₺/g },
+  { code: "RUB", regex: /\b(RUB)\b|₽/g },
+  { code: "AED", regex: /\b(AED|د\.إ)\b/g },
+  { code: "NGN", regex: /\b(NGN)\b|₦/g },
+  { code: "PLN", regex: /\b(PLN|zł)\b/g },
+];
+
+export function detectCurrency(text: string): string {
+  let best = "USD";
+  let bestCount = 0;
+  for (const { code, regex } of CURRENCY_PATTERNS) {
+    const matches = text.match(regex);
+    const n = matches ? matches.length : 0;
+    if (n > bestCount) {
+      bestCount = n;
+      best = code;
+    }
+  }
+  return bestCount > 0 ? best : "USD";
+}
+
 export async function parseFileToTransactions(
   file: File,
   extractFromText: (text: string) => Promise<RawTx[]>,
-): Promise<RawTx[]> {
+): Promise<ParseResult> {
   const name = file.name.toLowerCase();
   if (name.endsWith(".csv") || file.type === "text/csv") {
-    return parseTransactionsCsv(await file.text());
+    const text = await file.text();
+    return { transactions: parseTransactionsCsv(text), currency: detectCurrency(text) };
   }
   if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
     const buf = await file.arrayBuffer();
@@ -16,15 +60,17 @@ export async function parseFileToTransactions(
     const wb = XLSX.read(buf, { type: "array" });
     const sheet = wb.Sheets[wb.SheetNames[0]];
     const csv = XLSX.utils.sheet_to_csv(sheet);
+    const currency = detectCurrency(csv);
     const rows = parseTransactionsCsv(csv);
-    if (rows.length) return rows;
+    if (rows.length) return { transactions: rows, currency };
     // Fallback: use AI to extract from the raw sheet text
-    return extractFromText(csv);
+    return { transactions: await extractFromText(csv), currency };
   }
   if (name.endsWith(".pdf") || file.type === "application/pdf") {
     const text = await extractPdfText(file);
+    const currency = detectCurrency(text);
     const parsed = parseTransactionsFromStatementText(text);
-    if (parsed.length >= 3) return parsed;
+    if (parsed.length >= 3) return { transactions: parsed, currency };
 
     if (text.replace(/\s/g, "").length < 250) {
       throw new Error(
@@ -32,10 +78,11 @@ export async function parseFileToTransactions(
       );
     }
 
-    return extractFromText(compactStatementText(text));
+    return { transactions: await extractFromText(compactStatementText(text)), currency };
   }
   // Last-ditch: try CSV parse on text
-  return parseTransactionsCsv(await file.text());
+  const text = await file.text();
+  return { transactions: parseTransactionsCsv(text), currency: detectCurrency(text) };
 }
 
 export function parseTransactionsFromStatementText(text: string): RawTx[] {
